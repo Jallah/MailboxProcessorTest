@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Client", "Client\Client.fsproj", "{ACA5829D-A126-44ED-964A-FD65FBBA475A}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{1CBAD3B2-DB06-414E-9CCC-E364D9AF6793}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Server", "Server\Server.fsproj", "{0227C30B-377E-4D2E-B239-27EE105D8D22}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Client", "src\Client\Client.fsproj", "{ACA5829D-A126-44ED-964A-FD65FBBA475A}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Server", "src\Server\Server.fsproj", "{0227C30B-377E-4D2E-B239-27EE105D8D22}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -24,5 +26,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{ACA5829D-A126-44ED-964A-FD65FBBA475A} = {1CBAD3B2-DB06-414E-9CCC-E364D9AF6793}
+		{0227C30B-377E-4D2E-B239-27EE105D8D22} = {1CBAD3B2-DB06-414E-9CCC-E364D9AF6793}
 	EndGlobalSection
 EndGlobal

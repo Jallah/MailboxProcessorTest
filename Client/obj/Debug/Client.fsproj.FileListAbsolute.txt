@@ -1,9 +1,0 @@
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\Client.exe.config
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\Client.XML
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\Client.exe
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\Client.pdb
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\FSharp.Core.dll
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\FSharp.Core.xml
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\bin\Debug\de\FSharp.Core.resources.dll
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\obj\Debug\Client.exe
-C:\Users\Nicki\Desktop\Projects\MailboxProcessor\Client\obj\Debug\Client.pdb
