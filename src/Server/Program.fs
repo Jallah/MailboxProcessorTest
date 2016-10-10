@@ -1,19 +1,19 @@
 ﻿
-type client = { id:int; connection:System.Net.Sockets.TcpClient }
+type Client = { Id:int; Connection:System.Net.Sockets.TcpClient }
 
 let getStreamReaderAgent() =
-    new MailboxProcessor<client>(fun inbox ->
+    new MailboxProcessor<Client>(fun inbox ->
 
         async {
             let! client = inbox.Receive()
 
-            let streamReader = new System.IO.StreamReader(client.connection.GetStream())
+            let streamReader = new System.IO.StreamReader(client.Connection.GetStream())
 
             while true do
 
                 let! msg = streamReader.ReadLineAsync() |> Async.AwaitTask
 
-                printfn "got msg from %i: %s" client.id msg
+                printfn "got msg from %i: %s" client.Id msg
         })
 
 
@@ -24,7 +24,7 @@ let connectionHandler =
         async {
             let! con = inbox.Receive()
 
-            let client = {id=id; connection=con}
+            let client = {Id=id; Connection=con}
 
             let readerAgent = getStreamReaderAgent()
 

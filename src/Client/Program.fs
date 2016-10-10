@@ -27,7 +27,7 @@
 
 [<EntryPoint>]
 
-let main argv =
+let main _ =
 
     Agent.Start()
 
