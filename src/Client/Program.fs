@@ -1,4 +1,7 @@
-﻿let Agent =
+﻿open Protocol
+open Protocol.MessageHandling
+
+let Agent =
     new MailboxProcessor<string>(fun inbox ->
 
                 let tcpClient = new System.Net.Sockets.TcpClient()
@@ -11,9 +14,13 @@
 
                         async {
 
-                            let! msg = inbox.Receive()
+                            let! msg =  inbox.Receive()
 
-                            do! streamWriter.WriteLineAsync(msg) |> Async.AwaitTask
+                            let msgToSend = MessageType.Broadcast msg
+
+                            let serializedMsg = serializeMessage msgToSend
+
+                            do! streamWriter.WriteLineAsync(serializedMsg) |> Async.AwaitTask
 
                             do! streamWriter.FlushAsync() |> Async.AwaitTask
 
