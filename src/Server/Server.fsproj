@@ -52,7 +52,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Protocol\Protocol.fsproj">
+    <ProjectReference Include="..\Protocol\Protocol.fsproj">
       <Name>Protocol</Name>
       <Project>{adca9e1d-4441-4f57-87c2-9d975f66f1de}</Project>
       <Private>True</Private>
