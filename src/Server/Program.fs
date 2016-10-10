@@ -1,7 +1,8 @@
 ﻿open Protocol
 open Protocol.MessageHandling
+open System.Linq
 
-type Client = { Id:int; Connection:System.IO.StreamWriter }
+type Client = { Id:int; Connection:System.IO.StreamReader }
 
 let broadcastHandler (streamWriter: System.IO.StreamWriter list) (msg:string) =
     async {
@@ -16,62 +17,89 @@ let privateMsgHandler (streamWriter: System.IO.StreamWriter) (msg:string) =
          do! streamWriter.FlushAsync() |> Async.AwaitTask
     }
 
+type ReaderCommand =
+        | StartListening of Client
+        | GetBaseStream of AsyncReplyChannel<System.IO.Stream>
+
 type ConnectionCommand =
-    | GetAll of AsyncReplyChannel<Client list>
-    | GetById of int * AsyncReplyChannel<Client>
-    | AddClient of System.Net.Sockets.TcpClient
+    | GetAll of AsyncReplyChannel<System.IO.StreamWriter list>
+    | GetById of int * AsyncReplyChannel<System.IO.StreamWriter>
+    | AddClient of MailboxProcessor<ReaderCommand> * System.IO.StreamReader
+
 
 let connectionHandler =
     new MailboxProcessor<ConnectionCommand>(fun inbox ->
     
-    let mutable clients = []
+    let clients = new System.Collections.Generic.Dictionary<int, MailboxProcessor<ReaderCommand>>()
 
     let rec loop id =
         async {
             let! command = inbox.Receive()
 
             match command with
-            | AddClient con -> 
-                let client = {Id=id; Connection= new System.IO.StreamWriter(con.GetStream())}
-                clients <- [client] @ clients
-            | GetAll replyChannel -> replyChannel.Reply clients
-            | GetById (id, replyChannel) -> replyChannel.Reply (clients |> List.find (fun c -> c.Id = id))
+            | AddClient (connectionHandler, streamReader) ->
+                connectionHandler.Start()
+                let client = {Id=id; Connection=streamReader}
+                clients.Add(client.Id, connectionHandler)
+                connectionHandler.Post(ReaderCommand.StartListening client)
+            
+            | GetAll replyChannel ->
+                let writers = clients
+                                .Values
+                                .Select(fun cl -> cl.PostAndReply(ReaderCommand.GetBaseStream))
+                                .Select(fun stream -> new System.IO.StreamWriter(stream))
+                                .ToList()
+                                |> List.ofSeq
+
+                replyChannel.Reply writers
+            
+            | GetById (id, replyChannel) -> replyChannel.Reply (new System.IO.StreamWriter(clients.[id].PostAndReply(ReaderCommand.GetBaseStream)))
 
             return! loop (id + 1) 
         }
 
     loop 0)
 
+
 let getStreamReaderAgent() =
-    new MailboxProcessor<Client>(fun inbox ->
+    new MailboxProcessor<ReaderCommand>(fun inbox ->
+        let mutable baseStream = null
 
         let broadcast = 
             (fun msg ->
                  let clients = connectionHandler.PostAndReply(ConnectionCommand.GetAll)
-                               |> List.map(fun cl -> cl.Connection)
                  broadcastHandler clients msg)
        
         let privateMsg id =
             (fun msg ->
-                let client = connectionHandler.PostAndReply(fun replyChannel -> ConnectionCommand.GetById (id ,replyChannel)).Connection
+                let writer = connectionHandler.PostAndReply(fun replyChannel -> ConnectionCommand.GetById(id, replyChannel))
                 msg
-                |> privateMsgHandler client)
+                |> privateMsgHandler writer)
 
-        async {
-            let! client = inbox.Receive()
+        let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg
 
-            let streamReader = new System.IO.StreamReader(client.Connection.BaseStream)
+        let rec loop() = 
+            async {
+                let! command = inbox.Receive()
 
-            while true do
+                match command with
+                | GetBaseStream reply -> reply.Reply(baseStream)
 
-                let! msg = streamReader.ReadLineAsync() |> Async.AwaitTask
+                | StartListening client ->
+                    baseStream <- client.Connection.BaseStream
+                    async {
+                        let streamReader = client.Connection
 
-                do! Protocol.MessageHandling.handleMessage broadcast privateMsg msg
+                        while true do
+                            let! msg = streamReader.ReadLineAsync() |> Async.AwaitTask
+                            printfn "got msg from %i: %s" client.Id msg 
+                            do! messageHandler msg
 
-                printfn "got msg from %i: %s" client.Id msg
-        })
+                    } |> Async.Start
+                return! loop()
+            }
+        loop())
 
-        todo start readerAgent
 
 let connectionListener =
     new MailboxProcessor<unit>(fun _ ->
@@ -87,11 +115,12 @@ let connectionListener =
             async{
                 let! client = listener.AcceptTcpClientAsync() |> Async.AwaitTask
 
-                connectionHandler.Post (ConnectionCommand.AddClient client)
+                let addCommand = 
+                    let agent = getStreamReaderAgent()
+                    let reader =  new System.IO.StreamReader(client.GetStream())
+                    ConnectionCommand.AddClient (agent, reader)
 
-                let readerAgent = getStreamReaderAgent()
-                readerAgent.Start()
-                
+                connectionHandler.Post addCommand
 
                 printfn "client connected: %s" (client.Client.LocalEndPoint.ToString())
 

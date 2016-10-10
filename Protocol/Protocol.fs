@@ -10,8 +10,6 @@ module MessageHandling=
         match Newtonsoft.Json.JsonConvert.DeserializeObject<MessageType>(jsonString) with
         | Broadcast msg     -> broadcastHandler msg
         | Private (id, msg) -> privateHanlder id msg
-        
-
 
     let serializeMessage msg =
         let settings = new Newtonsoft.Json.JsonSerializerSettings()
