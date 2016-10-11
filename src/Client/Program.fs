@@ -2,20 +2,19 @@
 open Protocol.MessageHandling
 
 let Listener = 
-    new MailboxProcessor<System.Net.Sockets.TcpClient>(fun inbox ->
+    new MailboxProcessor<System.IO.StreamReader>(fun inbox ->
 
-        let rec listenLoop() = async{
+        let rec listenLoop() =
+            async{
 
-            let! client = inbox.Receive()
+                let! reader = inbox.Receive()
 
-            let reader = new System.IO.StreamReader(client.GetStream())
+                while true do
+                    let! msg = reader.ReadLineAsync() |> Async.AwaitTask
+                    printfn "got user message: %s" msg
 
-            while true do
-                let! msg = reader.ReadLineAsync() |> Async.AwaitTask
-                printfn "got user message: %s" msg
-
-            return! listenLoop()
-        }
+                return! listenLoop()
+            }
         listenLoop())
 
 let Agent =
@@ -25,11 +24,15 @@ let Agent =
 
                 tcpClient.Connect("127.0.0.1", 8888)
 
-                let streamWriter = new System.IO.StreamWriter(tcpClient.GetStream())
+                let stream = tcpClient.GetStream();
 
-                let listener = Listener
-                listener.Start()
-                listener.Post(tcpClient)
+                let streamWriter = new System.IO.StreamWriter(stream)
+
+                let streamReader = new System.IO.StreamReader(stream)
+
+                Listener.Start()
+                
+                Listener.Post(streamReader)
 
                 let rec loop() =
 
