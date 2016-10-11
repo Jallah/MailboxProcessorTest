@@ -10,12 +10,11 @@ module MessageHandling=
                    s.TypeNameHandling <- Newtonsoft.Json.TypeNameHandling.All
                    s
 
-
-    let handleMessage (broadcastHandler:string -> Async<unit>) privateHanlder jsonString =
+    let handleMessage (broadcastHandler:string -> string -> Async<unit>) privateHanlder senderId jsonString =
         try
             match Newtonsoft.Json.JsonConvert.DeserializeObject<MessageType>(jsonString, settings) with
-            | Broadcast msg     -> broadcastHandler msg
-            | Private (id, msg) -> privateHanlder id msg
+            | Broadcast msg             -> broadcastHandler senderId msg
+            | Private (recieverId, msg) -> privateHanlder recieverId senderId msg
         with
         |   ex -> 
             printfn "%s" (ex.ToString())

@@ -11,7 +11,7 @@ let Listener =
 
                 while true do
                     let! msg = reader.ReadLineAsync() |> Async.AwaitTask
-                    printfn "got user message: %s" msg
+                    printfn "%s" msg
 
                 return! listenLoop()
             }
@@ -40,7 +40,7 @@ let Agent =
 
                             let! msg =  inbox.Receive()
 
-                            let msgToSend = MessageType.Broadcast msg
+                            let msgToSend = MessageType.Broadcast msg //MessageType.Private(0, msg)
 
                             let serializedMsg = serializeMessage msgToSend
 
@@ -48,7 +48,7 @@ let Agent =
 
                             do! streamWriter.FlushAsync() |> Async.AwaitTask
 
-                            printfn "send msg %s" msg
+                            //printfn "send msg %s" msg
 
                             return! loop()
                         }
