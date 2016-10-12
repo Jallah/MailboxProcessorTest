@@ -2,65 +2,70 @@
 open Protocol.MessageHandling
 open System.Linq
 
-type Client = { Id:int; Connection:System.IO.Stream }
+type Agent<'a> = MailboxProcessor<'a>
+
+type Client = { Id:string; Connection:System.IO.Stream }
 
 type StreamHandlerCommand =
         | StartListening of Client
         | GetBaseStream of AsyncReplyChannel<System.IO.Stream>
         | WriteMessage of string
 
-let broadcastHandler (clients: MailboxProcessor<StreamHandlerCommand> list) (senderId:string) (msg:string) =
+type ConnectionHandlerCommand =
+    | GetAll of AsyncReplyChannel<Agent<StreamHandlerCommand> list>
+    | GetById of string * AsyncReplyChannel<Option<Agent<StreamHandlerCommand>>>
+    | AddClient of string * Agent<StreamHandlerCommand> * System.IO.Stream
+
+
+(*
+        Message handler
+*)
+let broadcastHandler (clients: Agent<StreamHandlerCommand> list) (senderId:string) (msg:string) =
     async {
         for client in clients do
             client.Post(WriteMessage (sprintf "%s -> %s" senderId msg))
     }
 
-let privateMsgHandler (client:  MailboxProcessor<StreamHandlerCommand>) (senderId:string) (msg:string) = 
+let privateMsgHandler (client:  Agent<StreamHandlerCommand>) (senderId:string) (msg:string) = 
     async{
          client.Post(WriteMessage (sprintf "%s -> %s" senderId msg))
     }
 
-type ConnectionHandlerCommand =
-    | GetAll of AsyncReplyChannel<MailboxProcessor<StreamHandlerCommand> list>
-    | GetById of int * AsyncReplyChannel<MailboxProcessor<StreamHandlerCommand>>
-    | AddClient of MailboxProcessor<StreamHandlerCommand> * System.IO.Stream
-
 
 let connectionHandler =
-    new MailboxProcessor<ConnectionHandlerCommand>(fun inbox ->
+    new Agent<ConnectionHandlerCommand>(fun inbox ->
     
-    let clients = new System.Collections.Generic.Dictionary<int, MailboxProcessor<StreamHandlerCommand>>()
+    let clients = new System.Collections.Generic.Dictionary<string, Agent<StreamHandlerCommand>>()
 
-    let rec loop id =
+    let rec loop() =
         async {
             let! command = inbox.Receive()
 
             match command with
-            | AddClient (conHandler, stream) ->
+            | AddClient (id, conHandler, stream) ->
                 conHandler.Start()
                 let client = {Id=id; Connection=stream}
                 clients.Add(client.Id, conHandler)
                 conHandler.Post(StartListening client)
                 
-                return! loop (id + 1) 
-
             | GetAll replyChannel ->
-                let writers = clients
-                                .Values
-                                |> List.ofSeq
-
-                replyChannel.Reply writers
-                return! loop (id)
+                clients.Values
+                    |> List.ofSeq
+                    |> replyChannel.Reply 
             
             | GetById (id, replyChannel) ->
-                replyChannel.Reply (clients.[id])
-                return! loop (id)
+                match clients.ContainsKey(id) with
+                | false -> None
+                | true   -> Some clients.[id]
+                |> replyChannel.Reply
+
+            return! loop()
         }
-    loop 0)
+    loop())
 
 
 let getStreamHandlerAgent() =
-    new MailboxProcessor<StreamHandlerCommand>(fun inbox ->
+    new Agent<StreamHandlerCommand>(fun inbox ->
         
         let mutable baseStream = null
         let mutable writer = null
@@ -74,7 +79,9 @@ let getStreamHandlerAgent() =
             (fun senderId msg ->
                 let client = connectionHandler.PostAndReply(fun replyChannel -> GetById(recieverId, replyChannel))
                 msg
-                |> privateMsgHandler client senderId )
+                |> privateMsgHandler client senderId)
+
+        //let login id =
 
         let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg
 
@@ -101,7 +108,7 @@ let getStreamHandlerAgent() =
                 | WriteMessage msg ->
 
                     async{
-                        match writer = null with
+                        match isNull writer with
                         | false ->
                             do! writer.WriteLineAsync(msg) |> Async.AwaitTask
                             do! writer.FlushAsync() |> Async.AwaitTask
@@ -113,7 +120,7 @@ let getStreamHandlerAgent() =
 
 
 let connectionListener =
-    new MailboxProcessor<unit>(fun _ ->
+    new Agent<unit>(fun _ ->
 
         let listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Parse("0.0.0.0"), 8888)
 
