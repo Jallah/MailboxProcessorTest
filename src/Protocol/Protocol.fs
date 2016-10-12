@@ -1,8 +1,8 @@
 ﻿namespace Protocol
 
 type MessageType =
-    | Broadcast of string
-    | Private of int * string
+    | Broadcast of string * string
+    | Private of string * string
     | Login of string
     | LoginError of string
 
@@ -15,7 +15,7 @@ module MessageHandling =
     let handleMessage broadcastHandler privateHandler loginHandler loginErrorHandler senderId jsonString =
                 try
                     match Newtonsoft.Json.JsonConvert.DeserializeObject<MessageType>(jsonString, settings) with
-                    | Broadcast msg             -> broadcastHandler senderId msg
+                    | Broadcast (_, msg)        -> broadcastHandler senderId msg
                     | Private (recieverId, msg) -> privateHandler recieverId senderId msg
                     | Login Id                  -> loginHandler Id
                     | LoginError msg            -> loginErrorHandler msg

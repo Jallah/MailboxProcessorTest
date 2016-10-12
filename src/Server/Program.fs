@@ -9,12 +9,16 @@ type Client = { Id:string; Connection:System.IO.Stream }
 type StreamHandlerCommand =
         | StartListening of Client
         | GetBaseStream of AsyncReplyChannel<System.IO.Stream>
-        | WriteMessage of string
+        | WriteMessage of MessageType
+        | StopListening
+        | Rename of string
 
 type ConnectionHandlerCommand =
     | GetAll of AsyncReplyChannel<Agent<StreamHandlerCommand> list>
     | GetById of string * AsyncReplyChannel<Option<Agent<StreamHandlerCommand>>>
-    | AddClient of string * Agent<StreamHandlerCommand> * System.IO.Stream
+    | AddClient of Option<string> * Agent<StreamHandlerCommand> * System.IO.Stream
+    | LoginClient of string * string
+
 
 
 (*
@@ -23,18 +27,27 @@ type ConnectionHandlerCommand =
 let broadcastHandler (clients: Agent<StreamHandlerCommand> list) (senderId:string) (msg:string) =
     async {
         for client in clients do
-            client.Post(WriteMessage (sprintf "%s -> %s" senderId msg))
+            client.Post(WriteMessage (Broadcast(senderId, msg)))
     }
 
 let privateMsgHandler (client:  Agent<StreamHandlerCommand>) (senderId:string) (msg:string) = 
     async{
-         client.Post(WriteMessage (sprintf "%s -> %s" senderId msg))
+         client.Post(WriteMessage (Private(senderId, msg)))
     }
 
+let loginHandler (connectionHandler: Agent<ConnectionHandlerCommand>) (client:  Agent<StreamHandlerCommand>) (currentId:string) (requestedId:string) = 
+    async{
+        match connectionHandler.PostAndReply(fun replyChannel -> GetById(requestedId, replyChannel)) with
+            | None ->
+                    connectionHandler.Post(LoginClient(currentId, requestedId)) 
+                    client.Post(Rename requestedId)
+            | Some _ -> client.Post(WriteMessage(LoginError("name in use")))
+    }
 
 let connectionHandler =
     new Agent<ConnectionHandlerCommand>(fun inbox ->
     
+    //TODO: two lists, one for loged in clients other for qued
     let clients = new System.Collections.Generic.Dictionary<string, Agent<StreamHandlerCommand>>()
 
     let rec loop() =
@@ -43,11 +56,20 @@ let connectionHandler =
 
             match command with
             | AddClient (id, conHandler, stream) ->
-                conHandler.Start()
-                let client = {Id=id; Connection=stream}
-                clients.Add(client.Id, conHandler)
-                conHandler.Post(StartListening client)
-                
+                match id with
+                | Some id ->
+                        conHandler.Start()
+                        let client = {Id=id; Connection=stream}
+                        clients.Add(client.Id, conHandler)
+                        conHandler.Post(StartListening client)
+                    
+                | None -> conHandler.Post(StopListening)
+             
+            | LoginClient (oldId, newId) -> 
+                        let client = clients.[oldId]
+                        clients.Remove(oldId) |> ignore
+                        clients.Add(newId, client)
+
             | GetAll replyChannel ->
                 clients.Values
                     |> List.ofSeq
@@ -69,6 +91,7 @@ let getStreamHandlerAgent() =
         
         let mutable baseStream = null
         let mutable writer = null
+        let mutable cl = Unchecked.defaultof<Client>
 
         let broadcast = 
             (fun senderId msg ->
@@ -77,40 +100,48 @@ let getStreamHandlerAgent() =
        
         let privateMsg recieverId =
             (fun senderId msg ->
-                let client = connectionHandler.PostAndReply(fun replyChannel -> GetById(recieverId, replyChannel))
-                msg
-                |> privateMsgHandler client senderId)
+                match connectionHandler.PostAndReply(fun replyChannel -> GetById(recieverId, replyChannel)) with
+                | Some handler -> msg |> privateMsgHandler handler senderId
+                | None -> async{()}) //TODO: handle user not found
 
-        //let login id =
+        let login requestedId =
+            loginHandler connectionHandler inbox cl.Id requestedId
+            
+        let loginErrorHandler _ = async{()}
 
-        let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg
+        let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg login loginErrorHandler
 
         let rec loop() = 
             async {
                 let! command = inbox.Receive()
 
                 match command with
+                | Rename newName -> cl <- { cl with Id = newName }
+
                 | GetBaseStream reply -> reply.Reply(baseStream)
 
                 | StartListening client ->
 
                     baseStream <- client.Connection
                     writer <- new System.IO.StreamWriter(client.Connection)
+                    cl <- client
 
                     async {
                         let streamReader = new System.IO.StreamReader(client.Connection)
                         while true do
                             let! msg = streamReader.ReadLineAsync() |> Async.AwaitTask
-                            printfn "got msg from %i: %s" client.Id msg 
-                            do! messageHandler (client.Id.ToString()) msg
+                            printfn "got msg from %s: %s" cl.Id msg 
+                            do! messageHandler (cl.Id.ToString()) msg
                     } |> Async.Start
+
+                | StopListening -> return () //TODO: dispose
 
                 | WriteMessage msg ->
 
                     async{
                         match isNull writer with
                         | false ->
-                            do! writer.WriteLineAsync(msg) |> Async.AwaitTask
+                            do! writer.WriteLineAsync(serializeMessage msg) |> Async.AwaitTask
                             do! writer.FlushAsync() |> Async.AwaitTask
                         | true -> ()
                     } |> Async.Start
@@ -135,8 +166,12 @@ let connectionListener =
 
                 let addCommand = 
                     let agent = getStreamHandlerAgent()
-                    let stream =  client.GetStream()
-                    AddClient (agent, stream)
+                    let stream = client.GetStream()
+                    let g = 
+                        let guid = System.Guid.NewGuid()
+                        guid.ToString()
+                        
+                    AddClient (Some g, agent, stream)
 
                 connectionHandler.Post addCommand
 

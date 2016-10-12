@@ -35,6 +35,9 @@ let Agent =
                 Listener.Start()
                 
                 Listener.Post(streamReader)
+                let login = serializeMessage (Login "nici")
+
+                streamWriter.WriteLine(login)
 
                 let rec loop() =
 
@@ -42,7 +45,7 @@ let Agent =
 
                             let! msg =  inbox.Receive()
 
-                            let msgToSend = MessageType.Broadcast msg //MessageType.Private(0, msg)
+                            let msgToSend = Broadcast ("", msg) //MessageType.Private(0, msg)
 
                             let serializedMsg = serializeMessage msgToSend
 
