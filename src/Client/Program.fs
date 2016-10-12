@@ -1,8 +1,10 @@
 ﻿open Protocol
 open Protocol.MessageHandling
 
+type Agent<'a> = MailboxProcessor<'a>
+
 let Listener = 
-    new MailboxProcessor<System.IO.StreamReader>(fun inbox ->
+    new Agent<System.IO.StreamReader>(fun inbox ->
 
         let rec listenLoop() =
             async{
@@ -18,7 +20,7 @@ let Listener =
         listenLoop())
 
 let Agent =
-    new MailboxProcessor<string>(fun inbox ->
+    new Agent<string>(fun inbox ->
 
                 let tcpClient = new System.Net.Sockets.TcpClient()
 
