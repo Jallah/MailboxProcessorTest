@@ -1,6 +1,7 @@
 ﻿open Protocol
 open Protocol.MessageHandling
 open System
+open System.Linq
 
 type ClientCommands =
     | SendMessage of string
@@ -74,24 +75,30 @@ let Agent =
 [<EntryPoint>]
 let main _ =
     
-    Agent.Start()
-    
-    let rec login() = 
-        printf "login as: "
-        let loginAs = System.Console.ReadLine();
-        
-        match loginAs with
-        | name when String.IsNullOrWhiteSpace name ->
-             printfn "not allowed"
-             login()
-        | _ -> Agent.Post(Login loginAs)    
-    
-    login()
+    if Diagnostics.Process.GetProcessesByName(System.IO.Path.GetFileNameWithoutExtension(System.Reflection.Assembly.GetEntryAssembly().Location)).Count() > 1 
+        then
+            printfn "nice try du wixer !!"
+            Console.ReadKey() |> ignore
+        else
 
-    while true do
+            Agent.Start()
+            
+            let rec login() = 
+                printf "login as: "
+                let loginAs = System.Console.ReadLine();
+                
+                match loginAs with
+                | name when String.IsNullOrWhiteSpace name ->
+                     printfn "not allowed"
+                     login()
+                | _ -> Agent.Post(Login loginAs)    
+            
+            login()
 
-        let msg = System.Console.ReadLine()
+            while true do
 
-        Agent.Post(SendMessage msg)
+                let msg = System.Console.ReadLine()
+
+                Agent.Post(SendMessage msg)
 
     0

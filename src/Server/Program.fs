@@ -181,7 +181,7 @@ let connectionListener =
 
                 connectionHandler.Post addCommand
 
-                printfn "client connected: %s" (client.Client.LocalEndPoint.ToString())
+                printfn "client connected: %s" (client.Client.RemoteEndPoint.ToString())
 
                 return! listenLoop()
             }
