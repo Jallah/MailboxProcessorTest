@@ -1,11 +1,23 @@
 ﻿open Protocol
 open Protocol.MessageHandling
+open System
+
+type ClientCommands =
+    | SendMessage of string
+    | Login of string
 
 type Agent<'a> = MailboxProcessor<'a>
 
-let Listener = 
-    new Agent<System.IO.StreamReader>(fun inbox ->
+let cprintfn(rnd: System.Random) msg =
+    let color:ConsoleColor = enum (rnd.Next(1, 14))
+    Console.ForegroundColor <- color
+    printfn "%s" msg
 
+let Listener = 
+    new Agent<IO.StreamReader>(fun inbox ->
+
+        let printmsg = cprintfn (new Random())
+    
         let rec listenLoop() =
             async{
 
@@ -13,18 +25,18 @@ let Listener =
 
                 while true do
                     let! msg = reader.ReadLineAsync() |> Async.AwaitTask
-                    printfn "%s" msg
+                    printmsg msg
 
                 return! listenLoop()
             }
         listenLoop())
 
 let Agent =
-    new Agent<string>(fun inbox ->
+    new Agent<ClientCommands>(fun inbox ->
 
                 let tcpClient = new System.Net.Sockets.TcpClient()
 
-                tcpClient.Connect("127.0.0.1", 8888)
+                tcpClient.Connect("172.30.215.102", 8888)
 
                 let stream = tcpClient.GetStream();
 
@@ -35,42 +47,51 @@ let Agent =
                 Listener.Start()
                 
                 Listener.Post(streamReader)
-                let login = serializeMessage (Login "nici")
-
-                streamWriter.WriteLine(login)
 
                 let rec loop() =
 
                         async {
 
-                            let! msg =  inbox.Receive()
+                            let! cmd =  inbox.Receive()
 
-                            let msgToSend = Broadcast ("", msg) //MessageType.Private(0, msg)
+                            match cmd with
+                            | SendMessage msg ->
+                                let msgToSend = Broadcast ("", msg) //MessageType.Private(0, msg)
+                                let serializedMsg = serializeMessage msgToSend
+                                do! streamWriter.WriteLineAsync(serializedMsg) |> Async.AwaitTask
+                                do! streamWriter.FlushAsync() |> Async.AwaitTask
 
-                            let serializedMsg = serializeMessage msgToSend
-
-                            do! streamWriter.WriteLineAsync(serializedMsg) |> Async.AwaitTask
-
-                            do! streamWriter.FlushAsync() |> Async.AwaitTask
-
-                            //printfn "send msg %s" msg
+                            | Login name ->
+                                let login = serializeMessage (Login name)
+                                do! streamWriter.WriteLineAsync(login) |> Async.AwaitTask
+                                do! streamWriter.FlushAsync() |> Async.AwaitTask
 
                             return! loop()
                         }
                 loop())
 
-           
 
 [<EntryPoint>]
-
 let main _ =
-
+    
     Agent.Start()
+    
+    let rec login() = 
+        printf "login as: "
+        let loginAs = System.Console.ReadLine();
+        
+        match loginAs with
+        | name when String.IsNullOrWhiteSpace name ->
+             printfn "not allowed"
+             login()
+        | _ -> Agent.Post(Login loginAs)    
+    
+    login()
 
     while true do
 
         let msg = System.Console.ReadLine()
 
-        Agent.Post(msg)
+        Agent.Post(SendMessage msg)
 
     0

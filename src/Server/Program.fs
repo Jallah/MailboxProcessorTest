@@ -38,9 +38,12 @@ let privateMsgHandler (client:  Agent<StreamHandlerCommand>) (senderId:string) (
 let loginHandler (connectionHandler: Agent<ConnectionHandlerCommand>) (client:  Agent<StreamHandlerCommand>) (currentId:string) (requestedId:string) = 
     async{
         match connectionHandler.PostAndReply(fun replyChannel -> GetById(requestedId, replyChannel)) with
+            // Success
             | None ->
                     connectionHandler.Post(LoginClient(currentId, requestedId)) 
                     client.Post(Rename requestedId)
+                    client.Post(WriteMessage(LoginSuccess ("successcully loged in as " + requestedId)))
+            // Error
             | Some _ -> client.Post(WriteMessage(LoginError("name in use")))
     }
 
@@ -109,7 +112,10 @@ let getStreamHandlerAgent() =
             
         let loginErrorHandler _ = async{()}
 
-        let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg login loginErrorHandler
+        let loginSuccessHandler _ = async{()}
+
+
+        let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg login loginErrorHandler loginSuccessHandler
 
         let rec loop() = 
             async {
