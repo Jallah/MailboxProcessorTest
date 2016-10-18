@@ -96,26 +96,25 @@ let getStreamHandlerAgent() =
         let mutable writer = null
         let mutable cl = Unchecked.defaultof<Client>
 
-        let broadcast = 
-            (fun senderId msg ->
-                 let clients = connectionHandler.PostAndReply(GetAll)
-                 broadcastHandler clients senderId msg)
-       
-        let privateMsg recieverId =
-            (fun senderId msg ->
-                match connectionHandler.PostAndReply(fun replyChannel -> GetById(recieverId, replyChannel)) with
-                | Some handler -> msg |> privateMsgHandler handler senderId
-                | None -> async{()}) //TODO: handle user not found
+//        let broadcast = 
+//            (fun senderId msg ->
+//                 let clients = connectionHandler.PostAndReply(GetAll)
+//                 broadcastHandler clients senderId msg)
+//       
+//        let privateMsg recieverId =
+//            (fun senderId msg ->
+//                match connectionHandler.PostAndReply(fun replyChannel -> GetById(recieverId, replyChannel)) with
+//                | Some handler -> msg |> privateMsgHandler handler senderId
+//                | None -> async{()}) //TODO: handle user not found
 
-        let login requestedId =
-            loginHandler connectionHandler inbox cl.Id requestedId
+        //let login requestedId =
+            //loginHandler connectionHandler inbox cl.Id requestedId
             
-        let loginErrorHandler _ = async{()}
+        //let loginErrorHandler _ = async{()}
 
-        let loginSuccessHandler _ = async{()}
+        //let loginSuccessHandler _ = async{()}
 
-
-        let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg login loginErrorHandler loginSuccessHandler
+        //let messageHandler = Protocol.MessageHandling.handleMessage broadcast privateMsg login loginErrorHandler loginSuccessHandler
 
         let rec loop() = 
             async {
@@ -137,7 +136,8 @@ let getStreamHandlerAgent() =
                         while true do
                             let! msg = streamReader.ReadLineAsync() |> Async.AwaitTask
                             printfn "got msg from %s: %s" cl.Id msg 
-                            do! messageHandler (cl.Id.ToString()) msg
+//                            do! messageHandler (cl.Id.ToString()) msg
+                            do! Protocol.MessageHandling.getMsgHandler msg
                     } |> Async.Start
 
                 | StopListening -> return () //TODO: dispose

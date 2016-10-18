@@ -37,7 +37,7 @@ let Agent =
 
                 let tcpClient = new System.Net.Sockets.TcpClient()
 
-                tcpClient.Connect("172.30.215.102", 8888)
+                tcpClient.Connect("127.0.0.1", 8888)
 
                 let stream = tcpClient.GetStream();
 
@@ -57,7 +57,7 @@ let Agent =
 
                             match cmd with
                             | SendMessage msg ->
-                                let msgToSend = Broadcast ("", msg) //MessageType.Private(0, msg)
+                                let msgToSend = {sender=""; message=msg}//Broadcast ("", msg) //MessageType.Private(0, msg)
                                 let serializedMsg = serializeMessage msgToSend
                                 do! streamWriter.WriteLineAsync(serializedMsg) |> Async.AwaitTask
                                 do! streamWriter.FlushAsync() |> Async.AwaitTask
@@ -93,7 +93,7 @@ let main _ =
                      login()
                 | _ -> Agent.Post(Login loginAs)    
             
-            login()
+            //login()
 
             while true do
 
