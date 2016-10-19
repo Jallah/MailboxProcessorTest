@@ -14,6 +14,7 @@ type LoginErrorMessage = {message:string}
 type LoginSuccessMessage = {message:string}
 
 type Message = {message:System.Type; handler:obj -> Async<unit>}
+type Message<'a> = {message:'a; messageHandler:'a -> Async<unit>}
 
 module MessageHandling =
 
@@ -21,9 +22,11 @@ module MessageHandling =
                    s.TypeNameHandling <- Newtonsoft.Json.TypeNameHandling.All
                    s
 
-    let toUntyped<'a> (handlerFunc:'a -> Async<unit>)=
-        fun (arg:obj) -> handlerFunc (arg :?> 'a)
+    let toUntyped<'a> (message:Message<'a>) : Message =
+        let { message=msg; messageHandler=handleFunc } = message
+        { message=msg.GetType(); handler=fun (arg:obj) -> handleFunc (arg :?> 'a) }
 
+        
     let logHandler<'a> (msg:'a) = async { printfn "MSG: %A" msg }
 
     let broadCastHandler msg =  async {
@@ -31,11 +34,15 @@ module MessageHandling =
                                     printfn "Broadcast: %s" broadcast
                                 }
 
-    let Messages = [ {message=typeof<BroadCastMessage>; handler= toUntyped broadCastHandler }
-                     {message=typeof<PrivateMessage>; handler=logHandler }
-                     {message=typeof<LoginMessage>; handler=logHandler }
-                     {message=typeof<LoginErrorMessage>; handler=logHandler }
-                     {message=typeof<LoginSuccessMessage>; handler=logHandler }]
+    let mutable Messages = []
+
+   // let registerMessage msg()
+
+//    let Messages = [ {message=typeof<BroadCastMessage>; handler= toUntyped broadCastHandler }
+//                     {message=typeof<PrivateMessage>; handler=logHandler }
+//                     {message=typeof<LoginMessage>; handler=logHandler }
+//                     {message=typeof<LoginErrorMessage>; handler=logHandler }
+//                     {message=typeof<LoginSuccessMessage>; handler=logHandler }]
 
     let getMessageByType msgType = 
                 Messages
