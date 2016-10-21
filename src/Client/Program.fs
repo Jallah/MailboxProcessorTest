@@ -7,6 +7,25 @@ type ClientCommands =
     | SendMessage of string
     | Login of string
 
+type BroadCastMessage = {Sender:string; Message:string}
+type PrivateMessage = {Recipient:string; Message:string}
+type LoginMessage = {Name:string}
+type LoginErrorMessage = {Message:string}
+type LoginSuccessMessage = {Message:string}
+
+let broadCastHandler msg =  async {
+                                    let {Sender=_; Message=broadcast} = msg
+                                    printfn "Broadcast: %s" broadcast
+                                }
+
+let logHandler<'a> (msg:'a) = async { printfn "MSG: %A" msg }
+
+let boradCastM = {Message=typeof<BroadCastMessage>; MessageHandler=broadCastHandler}
+let privateM = {Message=typeof<PrivateMessage>; MessageHandler=logHandler<PrivateMessage>}
+let loginM = {Message=typeof<LoginMessage>; MessageHandler=logHandler<LoginMessage>}
+let loginErrorM = {Message=typeof<LoginErrorMessage>; MessageHandler=logHandler<LoginErrorMessage>}
+let loginSuccessM = {Message=typeof<LoginSuccessMessage>; MessageHandler=logHandler<LoginSuccessMessage>}
+
 type Agent<'a> = MailboxProcessor<'a>
 
 let cprintfn(rnd: System.Random) msg =
@@ -57,13 +76,13 @@ let Agent =
 
                             match cmd with
                             | SendMessage msg ->
-                                let msgToSend = {sender=""; message=msg}//Broadcast ("", msg) //MessageType.Private(0, msg)
-                                let serializedMsg = serializeMessage msgToSend
+                                let msgToSend = {Sender=""; Message=msg}//Broadcast ("", msg) //MessageType.Private(0, msg)
+                                let serializedMsg = serialize msgToSend
                                 do! streamWriter.WriteLineAsync(serializedMsg) |> Async.AwaitTask
                                 do! streamWriter.FlushAsync() |> Async.AwaitTask
 
                             | Login name ->
-                                let login = serializeMessage (Login name)
+                                let login = serialize (Login name)
                                 do! streamWriter.WriteLineAsync(login) |> Async.AwaitTask
                                 do! streamWriter.FlushAsync() |> Async.AwaitTask
 

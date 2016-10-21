@@ -9,7 +9,7 @@ type Client = { Id:string; Connection:System.IO.Stream }
 type StreamHandlerCommand =
         | StartListening of Client
         | GetBaseStream of AsyncReplyChannel<System.IO.Stream>
-        | WriteMessage of MessageType
+        | WriteMessage of obj
         | StopListening
         | Rename of string
 

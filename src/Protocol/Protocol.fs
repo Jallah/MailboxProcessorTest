@@ -1,50 +1,43 @@
 ﻿namespace Protocol
 
-//type MessageType =
-//    | Broadcast of string * string
-//    | Private of string * string
-//    | Login of string
-//    | LoginError of string
-//    | LoginSuccess of string
-
-type BroadCastMessage = {Sender:string; Message:string}
-type PrivateMessage = {Recipient:string; Message:string}
-type LoginMessage = {Name:string}
-type LoginErrorMessage = {Message:string}
-type LoginSuccessMessage = {Message:string}
 
 
 
-type private Message = {Message:System.Type; Handler:obj -> Async<unit>}
-type Message<'a> = {Message:'a; MessageHandler:'a -> Async<unit>}
+type private Message = {Message:System.Type; Handle:obj -> Async<unit>}
+type Message<'a> = {Message:System.Type; MessageHandler:'a -> Async<unit>}
 
 module MessageHandling =
+   
 
-    let broadCastHandler msg =  async {
-                                    let {Sender=_; Message=broadcast} = msg
-                                    printfn "Broadcast: %s" broadcast
-                                }
-
-    let logHandler<'a> (msg:'a) = async { printfn "MSG: %A" msg }
-
+    let mutable private messages:Message list = []
     
     let settings = let s = new Newtonsoft.Json.JsonSerializerSettings()
                    s.TypeNameHandling <- Newtonsoft.Json.TypeNameHandling.All
                    s
+    
+    let serialize msg =
+        Newtonsoft.Json.JsonConvert.SerializeObject(msg,settings)
+
+    let deserialize serializedMessage =
+        Newtonsoft.Json.JsonConvert.DeserializeObject(serializedMessage, settings)
 
     let private toUntyped message =
         let { Message=msg; MessageHandler=handleFunc } = message
-        { Message=msg.GetType(); Handler=fun (arg:obj) -> handleFunc (arg :?> 'a) }
+        { Message=msg; Handle=fun (arg:obj) -> handleFunc (arg :?> 'a) }
 
-    let mutable Messages:Message list = []
+    let private tryGetMessage msg =
+                messages
+                |> List.tryFind (fun msg -> msg.Message = msg.GetType())
 
     let registerMessage msg =
-        match tryGetMessage
-        Messages <- (toUntyped msg) :: Messages
-        
-    let private tryGetMessage msgType = 
-                Messages
-                |> List.tryFind (fun msg -> msg.Message = msgType.GetType())
+        messages <- (msg |> toUntyped) :: messages
+    
+    let getHandler serializedMessage =
+        let msg = serializedMessage |> deserialize
+        match msg |> tryGetMessage with
+        | Some message -> message.Handle msg
+        | None -> failwith "unknow message" 
+   
 
 //    let Messages = [ {message=typeof<BroadCastMessage>; handler= toUntyped broadCastHandler }
 //                     {message=typeof<PrivateMessage>; handler=logHandler }
@@ -54,25 +47,24 @@ module MessageHandling =
 
     
 
-    let getMsgHandler jsonString =
-        let deserializedMsg = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString, settings);
-        (getMessageByType deserializedMsg).MessageHandler deserializedMsg
-    
-
-    let handleMessage broadcastHandler privateHandler loginHandler loginErrorHandler loginSuccessHandler senderId jsonString =
-                try
-                    match Newtonsoft.Json.JsonConvert.DeserializeObject<MessageType>(jsonString, settings) with
-                    | Broadcast (_, msg)        -> broadcastHandler senderId msg
-                    | Private (recieverId, msg) -> privateHandler recieverId senderId msg
-                    | Login Id                  -> loginHandler Id
-                    | LoginError msg            -> loginErrorHandler msg
-                    | LoginSuccess msg          -> loginSuccessHandler msg
-
-                with
-                |   ex -> 
-                    printfn "%s" (ex.ToString())
-                    failwith ex.Message
+//    let getMsgHandler jsonString =
+//        let deserializedMsg = Newtonsoft.Json.JsonConvert.DeserializeObject(jsonString, settings);
+//        (getMessageByType deserializedMsg).MessageHandler deserializedMsg
+//    
+//
+//    let handleMessage broadcastHandler privateHandler loginHandler loginErrorHandler loginSuccessHandler senderId jsonString =
+//                try
+//                    match Newtonsoft.Json.JsonConvert.DeserializeObject<MessageType>(jsonString, settings) with
+//                    | Broadcast (_, msg)        -> broadcastHandler senderId msg
+//                    | Private (recieverId, msg) -> privateHandler recieverId senderId msg
+//                    | Login Id                  -> loginHandler Id
+//                    | LoginError msg            -> loginErrorHandler msg
+//                    | LoginSuccess msg          -> loginSuccessHandler msg
+//
+//                with
+//                |   ex -> 
+//                    printfn "%s" (ex.ToString())
+//                    failwith ex.Message
      
 
-    let serializeMessage msg =
-        Newtonsoft.Json.JsonConvert.SerializeObject(msg,settings)
+    
