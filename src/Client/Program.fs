@@ -7,11 +7,7 @@ type ClientCommands =
     | SendMessage of string
     | Login of string
 
-type BroadCastMessage = {Sender:string; Message:string}
-type PrivateMessage = {Recipient:string; Message:string}
-type LoginMessage = {Name:string}
-type LoginErrorMessage = {Message:string}
-type LoginSuccessMessage = {Message:string}
+
 
 let broadCastHandler msg =  async {
                                     let {Sender=_; Message=broadcast} = msg
@@ -20,11 +16,11 @@ let broadCastHandler msg =  async {
 
 let logHandler<'a> (msg:'a) = async { printfn "MSG: %A" msg }
 
-let boradCastM = {Message=typeof<BroadCastMessage>; MessageHandler=broadCastHandler}
-let privateM = {Message=typeof<PrivateMessage>; MessageHandler=logHandler<PrivateMessage>}
-let loginM = {Message=typeof<LoginMessage>; MessageHandler=logHandler<LoginMessage>}
-let loginErrorM = {Message=typeof<LoginErrorMessage>; MessageHandler=logHandler<LoginErrorMessage>}
-let loginSuccessM = {Message=typeof<LoginSuccessMessage>; MessageHandler=logHandler<LoginSuccessMessage>}
+let broadCastM = new Message<BroadCastMessage>(broadCastHandler)
+let privateM = new Message<PrivateMessage>(logHandler)
+let loginM = new Message<LoginMessage>(logHandler)
+let loginErrorM = new Message<LoginErrorMessage>(logHandler)
+let loginSuccessM = new Message<LoginSuccessMessage>(logHandler)
 
 type Agent<'a> = MailboxProcessor<'a>
 

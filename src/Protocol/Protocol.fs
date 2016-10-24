@@ -1,13 +1,20 @@
 ﻿namespace Protocol
 
-
-
-
+type BroadCastMessage = {Sender:string; Message:string}
+type PrivateMessage = {Recipient:string; Message:string}
+type LoginMessage = {Name:string}
+type LoginErrorMessage = {Message:string}
+type LoginSuccessMessage = {Message:string}
 type private Message = {Message:System.Type; Handle:obj -> Async<unit>}
-type Message<'a> = {Message:System.Type; MessageHandler:'a -> Async<unit>}
+
+//type Message<'a> = {Message:System.Type; MessageHandler:'a -> Async<unit>}
 
 module MessageHandling =
    
+    type Message<'a>(handler) =
+        let messageType = typeof<'a>
+        member this.Message = messageType
+        member this.Handle: msg:'a -> Async<unit> = handler
 
     let mutable private messages:Message list = []
     
@@ -21,9 +28,8 @@ module MessageHandling =
     let deserialize serializedMessage =
         Newtonsoft.Json.JsonConvert.DeserializeObject(serializedMessage, settings)
 
-    let private toUntyped message =
-        let { Message=msg; MessageHandler=handleFunc } = message
-        { Message=msg; Handle=fun (arg:obj) -> handleFunc (arg :?> 'a) }
+    let private toUntyped (message:Message<'a>) =
+        { Message=message.Message; Handle=fun (arg:obj) -> message.Handle (arg :?> 'a) }
 
     let private tryGetMessage msg =
                 messages

@@ -27,12 +27,12 @@ type ConnectionHandlerCommand =
 let broadcastHandler (clients: Agent<StreamHandlerCommand> list) (senderId:string) (msg:string) =
     async {
         for client in clients do
-            client.Post(WriteMessage (Broadcast(senderId, msg)))
+            client.Post(WriteMessage {Sender=senderId;Message=msg} )
     }
 
 let privateMsgHandler (client:  Agent<StreamHandlerCommand>) (senderId:string) (msg:string) = 
     async{
-         client.Post(WriteMessage (Private(senderId, msg)))
+         client.Post(WriteMessage {Recipient=senderId; Message=msg})
     }
 
 let loginHandler (connectionHandler: Agent<ConnectionHandlerCommand>) (client:  Agent<StreamHandlerCommand>) (currentId:string) (requestedId:string) = 
@@ -42,9 +42,9 @@ let loginHandler (connectionHandler: Agent<ConnectionHandlerCommand>) (client:  
             | None ->
                     connectionHandler.Post(LoginClient(currentId, requestedId)) 
                     client.Post(Rename requestedId)
-                    client.Post(WriteMessage(LoginSuccess ("successcully loged in as " + requestedId)))
+                    client.Post(WriteMessage { LoginSuccessMessage.Message = "successcully loged in as " + requestedId })
             // Error
-            | Some _ -> client.Post(WriteMessage(LoginError("name in use")))
+            | Some _ -> client.Post(WriteMessage {LoginErrorMessage.Message = "name in use"})
     }
 
 let connectionHandler =
